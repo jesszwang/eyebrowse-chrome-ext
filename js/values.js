@@ -429,7 +429,6 @@ function highlighting(user, baseUrl) {
                     });
                     $('.annote-header').html("Success - tags added!");
                     $('.annote-text').html("")
-                    console.log(tags_to_save);
 
                     setTimeout(function() {
                       $('.annotation').fadeOut('fast');
@@ -521,8 +520,14 @@ function highlighting(user, baseUrl) {
               $('.annote-text').append(empty_message);
             }
 
+            var tag_area = $("<div>", {"class": "tag_area"});
+            var add_tag_area = $("<div>", {"class": "add_tag_area"});
+
+            $('.annote-text').append(tag_area);
+            $('.annote-text').append(add_tag_area);
+
             // Add value tags to DOM
-            for (var item in vts) {
+            $.each(vts, function(item) {
               var tag_attrs = vts[item];
               var annote_text_wrapper = $("<div>", {"class": "annote-text-wrapper", "id": tag_attrs.name});
               var annote_valuetag = $("<div>", {"class": "annote-valuetag", "id": tag_attrs.name});
@@ -574,23 +579,45 @@ function highlighting(user, baseUrl) {
               annote_left_box.append(annote_valuetag);
               annote_left_box.append(annote_vote);
 
-              annote_text_wrapper.append(annote_left_box);
-              annote_text_wrapper.append(annote_voters);
-              annote_text_wrapper.append(annote_valuetag_desc);
-              $('.annote-text').append(annote_text_wrapper);
-            }  
+              var comment_wrapper = $("<div>", {"class": "comment-wrapper"});
+              var comments_wrapper = $("<div>", {"class": "comments-wrapper", "tag_name": tag_attrs.name});
+              var add_comment_wrapper = $("<div>", {"class": "add-comment-wrapper"});
+              var add_comment_box = $("<textarea>", {"class": "add-comment-box", "tag_name": tag_attrs.name, "placeholder": "Write a comment...", "maxlength": 500});
+              var add_comment_submit = $("<div>", {"class": "add-comment-submit", "tag_name": tag_attrs.name, "highlight": highlight});
+              add_comment_submit.html("Comment");
+
+              $.get(baseUrl + "/tags/comments", {
+                'url': url,
+                'highlight': encode_highlight(highlight),
+                'tag_name': tag_attrs.name,
+              }).done(function(res) {
+                $.each(res.data.comments, function(i) {
+                  var comment = res.data.comments[i];
+                  var comment_box = createComment(comment);
+                  comments_wrapper.append(comment_box);
+                });
+
+                add_comment_wrapper.append(add_comment_box);
+                add_comment_wrapper.append(add_comment_submit);
+                comment_wrapper.append(comments_wrapper);
+                comment_wrapper.append(add_comment_wrapper);
+
+                annote_text_wrapper.append(annote_left_box);
+                annote_text_wrapper.append(annote_voters);
+                annote_text_wrapper.append(annote_valuetag_desc);
+                annote_text_wrapper.append(comment_wrapper);
+                tag_area.append(annote_text_wrapper);
+              });              
+            });  
 
             var add_tag_existing = $("<div>", {"class": "highlight-add-custom-tag existing"});
             var add_tag_existing_tags = $("<div>", {"class": "highlight-add-custom-tag-tags"});
             var vertical_space = $("<div>", {"class": "vertical-space"});
             add_tag_existing.html("+ Add additional tags");
 
-            console.log(vts);
             for (var t in all_tags) {
               var already_exists = false;
               for (var item in vts) {
-                console.log(vts[item]);
-                console.log(t);
                 if (t === vts[item].name) {
                   already_exists = true;
                 }
@@ -614,10 +641,10 @@ function highlighting(user, baseUrl) {
             }
 
             text = $(e.target).attr("highlight");
-            $('.annote-text').append(add_tag_existing);
+            add_tag_area.append(add_tag_existing);
             add_tag_existing_tags.append(add_tag_existing_submit);
-            $('.annote-text').append(add_tag_existing_tags);
-            $('.annote-text').append(vertical_space);
+            add_tag_area.append(add_tag_existing_tags);
+            add_tag_area.append(vertical_space);
           });
 
           // Get position to display annotation box in
@@ -626,6 +653,68 @@ function highlighting(user, baseUrl) {
           showAnnotationBox([left, top]);
         }
       }
+
+      function createComment(comment) {
+        var comment_box = $("<div>", {"class": "comment-box", "comment_id": comment.id});
+        comment_box.html(
+          "<div class='comment-left'><img class='comment-user-pic' src=" + comment.prof_pic + "/></div>" 
+          + "<div class='comment-right'><span class='comment-user-name'>" + comment.user + "</span><span class='comment-text'>" + comment.comment + "</span>"
+          + "<div class='comment-date'>" + comment.date + "</div></div>"
+        );
+
+        if (comment.user === user.username) {
+          comment_box.append("<div class='comment-modify'><i class='fa fa-pencil comment-edit' aria-hidden='true'></i></div>");
+        }
+
+        return comment_box;
+      }
+
+      function addComment(url, tag_name, comment, highlight) {
+        $.post(baseUrl + "/tags/comment/add", {
+          'url': url,
+          'comment': comment,
+          'tag_name': tag_name,
+          'highlight': highlight,
+          "csrfmiddlewaretoken": user.csrf,
+        }).done(function(res) {
+          if (res.success) {
+            var new_comment = createComment(res.comment);
+            $('.comments-wrapper[tag_name=' + tag_name + ']').append(new_comment);
+            $('.add-comment-box[tag_name=' + tag_name + ']').val('');
+          }
+        });
+      }
+
+      $('body').on('mouseenter', '.comment-box', function(e) {
+        var comment_id = $(e.target).attr('comment_id')
+        if (!$('.update-comment-box[comment_id=' + comment_id + ']').is(':visible')) {
+          $(this).children('.comment-modify').show();
+          $(this).css('background-color', '#f9f9f9');
+        }
+      });
+
+      $('body').on('mouseleave', '.comment-box', function(e) {
+        $(this).children('.comment-modify').hide();
+        $(this).css('background-color', '#fff');
+      });
+
+      $('body').on('click', '.comment-edit', function(e) {
+        $(this).parent().hide();
+        $(this).parent().parent().css('background-color', '#fff');
+        var comment_id = $(e.target).attr('comment_id');
+        var current_comment = $(e.target).parent().parent().children('.comment-right').children('.comment-text')
+        var add_comment_box = $("<textarea>", {"class": "update-comment-box", "maxlength": 500, "comment_id": comment_id});
+        add_comment_box.val(current_comment.html());
+        current_comment.html(add_comment_box);
+      });
+
+      $('body').on('click', '.add-comment-submit', function(e) {
+        e.preventDefault();
+        var tag_name = $(this).attr('tag_name')
+        var comment = $('.add-comment-box[tag_name=' + tag_name + ']').val();
+        var highlight = encode_highlight($(this).attr('highlight'));
+        addComment(url, tag_name, comment, highlight);
+      });
 
       var annotationDelay;
       // Pop up annotation box on hover with delay
@@ -636,10 +725,34 @@ function highlighting(user, baseUrl) {
         }, 700);
       });
 
+      $('body').on('keydown', function(e) {
+        if (e.keyCode === 13 && $('.add-comment-box').is(':focus')) {
+          var tag_name = $(e.target).attr('tag_name')
+          var comment = $(e.target).val();
+          var highlight = encode_highlight($('.add-comment-submit[tag_name=' + tag_name + ']').attr('highlight'));
+          addComment(url, tag_name, comment, highlight);
+        }
+
+        if (e.keyCode === 13 && $('.update-comment-box').is(':focus')) {
+          var comment_id = $(e.target).parent().parent().parent().attr('comment_id');
+          var new_comment = $(e.target).val();
+          var text_box = $(e.target).parent();
+
+          $.post(baseUrl + '/tags/comment/edit', {
+            'comment_id': comment_id,
+            'new_comment': new_comment,
+            "csrfmiddlewaretoken": user.csrf,
+          }).done(function(res) {
+            text_box.html(new_comment);
+            console.log('Edited comment!');
+          });
+        }
+      });
+
       // Pop up annotation box on hover immediately
       $('body').on('click', '.highlight-annote', function(e) {
         makeAnnotationBox($(this), e);
-      })
+      });
 
       // Cancel annotation box appearance delay
       $('body').on('mouseleave', '.highlight-annote', function(e) {
@@ -686,11 +799,8 @@ function highlighting(user, baseUrl) {
               $(".annote-votecount#" + tagName).html(vote_counts[tagName]);
               $(".annote-votebutton#" + tagName).html(getVoteButton(tagName, true, highlight));
 
-              console.log($(".extra-votes-count[name=" + tagName + "]"));
-
               if ($(".extra-votes-count[name=" + tagName + "]").is(":visible")) {
                 var num_votes = parseInt($(".extra-votes-count").attr("votes"));
-                console.log(num_votes);
 
                 if (!$(".annote-voters#" + tagName + " .extra-votes-count").hasClass("extra-votes-count")) {
                   $(".annote-voters#" + tagName + " span:nth-child(2)").hide(function() { $(this).remove(); });
@@ -728,7 +838,6 @@ function highlighting(user, baseUrl) {
                 $(this).removeClass("valuetag_rmvote").addClass("valuetag_vote");
                 $(".annote-votecount#" + tagName).html(vote_counts[tagName]);
                 $(".annote-votebutton#" + tagName).html(getVoteButton(tagName, false, highlight));
-                console.log($(".votes-byuser#" + user.username + "[name=" + tagName + "]"));
                 if (!$(".votes-byuser#" + user.username + "[name=" + tagName + "]").is(":visible")) {
                   var extra_votes_count = parseInt($(".extra-votes-count[name=" + tagName + "]").attr("votes"));
 
