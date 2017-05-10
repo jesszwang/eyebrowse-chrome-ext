@@ -453,9 +453,6 @@ function openItem(tabId, url, favIconUrl, title, event_type) {
     }
     var timeCheck = checkTimeDelta();
 
-    if (!isInHighlightBlacklist(url)) {
-        highlight();
-    }
 
     // if its not in the whitelist lets check that the user has it
     setTimeout(function() {
@@ -527,25 +524,6 @@ function bubbleInfo(tabId, url) {
             });
         }
     });
-}
-
-function highlight() {
-    chrome.tabs.getSelected(null, function(tab) {
-        var id = tab.id;
-
-        chrome.tabs.query({
-            active: true,
-            currentWindow: true
-        }, function(tabArray) {
-            if (isActiveTab(tabArray, id)) {
-                chrome.tabs.sendMessage(id, {
-                    "type": "highlight",
-                    "user": user,
-                    "baseUrl": baseUrl,
-                });
-            }
-        });
-    }); 
 }
 
 /*

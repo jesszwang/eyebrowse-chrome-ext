@@ -16,8 +16,7 @@
                 "libs/jquery.idle.js", 
                 "js/common.js", 
                 "js/prompt.js", 
-                "js/idle-detection.js", 
-                "js/sdk.js"
+                "js/idle-detection.js"
             ], 
             "matches": [
                 "<all_urls>"

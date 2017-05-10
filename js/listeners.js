@@ -72,16 +72,6 @@ function focusedWindowListener() {
     });
 }
 
-function onCompletedListener() {
-    chrome.webNavigation.onCompleted.addListener(function(details) {
-        if (details.frameId === 0) {
-            if (!isInHighlightBlacklist(details.url)) {
-                highlight();
-            }
-        }
-    });
-}
-
 
 /*
     Helper function to get the tab with tabId and open the item
